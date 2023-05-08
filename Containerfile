@@ -12,18 +12,16 @@ RUN dnf -y install dnf-plugins-core && \
     dnf -y clean all && rm -rf /var/cache/dnf
  # codeready-builder-for-rhel-8-x86_64-rpms && \
 
-RUN git clone https://github.com/kooleila/snwc_ml_correction.git
+RUN git clone https://github.com/fmidev/snwc_bc.git
 
-WORKDIR /snwc_ml_correction
+WORKDIR /snwc_bc
 
-#ADD biasc.py /snwc_ml_correction
-ADD xgb_RH_tuned23.joblib /snwc_ml_correction
-ADD xgb_WS_tuned23.joblib /snwc_ml_correction
-ADD xgb_WG_tuned23.joblib /snwc_ml_correction
-ADD xgb_T2m_tuned23.joblib /snwc_ml_correction
-ADD https://lake.fmi.fi/dem-data/DEM_100m-Int16.tif /snwc_ml_correction
-#ADD DEM_100m-Int16.tif /snwc_ml_correction
-ADD requirements.txt /snwc_ml_correction
+ADD xgb_RH_tuned23.joblib /snwc_bc
+ADD xgb_WS_tuned23.joblib /snwc_bc
+ADD xgb_WG_tuned23.joblib /snwc_bc
+ADD xgb_T2m_tuned23.joblib /snwc_bc
+ADD https://lake.fmi.fi/dem-data/DEM_100m-Int16.tif /snwc_bc
+ADD requirements.txt /snwc_bc
 
 RUN chmod 644 DEM_100m-Int16.tif && \
     update-alternatives --set python3 /usr/bin/python3.8 && \
