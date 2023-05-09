@@ -126,10 +126,14 @@ def read_grib(gribfile, read_coordinates=False):
     forecasttime = []
     values = []
 
+    print(f"Reading file {gribfile}")
     wrk_gribfile = gribfile
 
     if gribfile.startswith("s3://"):
         wrk_gribfile = read_file_from_s3(gribfile)
+
+    lons=[]
+    lats=[]
 
     with open(wrk_gribfile) as fp:
         # print("Reading {}".format(gribfile))
@@ -155,14 +159,11 @@ def read_grib(gribfile, read_coordinates=False):
             tempvals = ecc.codes_get_values(gh).reshape(nj, ni)
             values.append(tempvals)
 
-            if read_coordinates:
+            if read_coordinates and len(lons) == 0:
                 projstr = get_projstr(gh)
 
                 di = ecc.codes_get_double(gh, "DxInMetres")
                 dj = ecc.codes_get_double(gh, "DyInMetres")
-
-                lons = []
-                lats = []
 
                 proj_to_ll = pyproj.Transformer.from_crs(projstr, "epsg:4326")
 
