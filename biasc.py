@@ -17,6 +17,7 @@ import joblib
 import copy
 import numpy.ma as ma
 import warnings
+from multiprocessing import Process, Queue
 warnings.filterwarnings('ignore')
 
 def parse_command_line():
@@ -37,6 +38,7 @@ def parse_command_line():
     )
     parser.add_argument("--output", action="store", type=str, required=True)
     parser.add_argument("--plot", action="store_true", default=False)
+    parser.add_argument("--disable_multiprocessing", action="store_true", default=False)
 
     args = parser.parse_args()
 
@@ -493,6 +495,30 @@ def write_grib(args, analysistime, forecasttime, data):
     print(f"Wrote file {args.output}")
 
 
+def interpolate_single_time(grid, background, points, obs,obs_to_background_variance_ratio, pobs, structure, max_points, idx, q):
+
+    # perform optimal interpolation
+    tmp_output = gridpp.optimal_interpolation(
+            grid,
+            background,
+            points,
+            obs[idx]["biasc"].to_numpy(),
+            obs_to_background_variance_ratio,
+            pobs,
+            structure,
+            max_points,
+        )
+
+    print("step {} min grid: {:.1f} max grid: {:.1f}".format(idx, np.amin(tmp_output), np.amax(tmp_output)))
+
+    if q is not None:
+        # return index and output, so that the results can
+        # later be sorted correctly
+        q.put((idx, tmp_output))
+    else:
+        return tmp_output
+
+
 def interpolate(grid, points, background, obs, args, lc):
     """Perform optimal interpolation"""
 
@@ -505,7 +531,7 @@ def interpolate(grid, points, background, obs, args, lc):
     # When bias is gridded then background is zero so pobs is just array of zeros
     pobs = gridpp.nearest(grid, points, background)
 
-    # Barnes structure function with horizontal decorrelation length 100km,
+    # Barnes structure function with horizontal decorrelation length 30km,
     # vertical decorrelation length 200m
     structure = gridpp.BarnesStructure(30000, 200, 0.5)
 
@@ -516,28 +542,31 @@ def interpolate(grid, points, background, obs, args, lc):
     # smaller values -> more trust to observations
     obs_to_background_variance_ratio = np.full(points.size(), 0.1)
 
-    for j in range(0,len(obs)):
-        tmp_obs = obs[j]
-        print("min_points:",round(min(tmp_obs["biasc"]),1), "max_points:", round(max(tmp_obs["biasc"]),1))
+    if args.disable_multiprocessing:
+        output = [interpolate_single_time(grid, background, points, obs, obs_to_background_variance_ratio, pobs, structure, max_points, x, None) for x in range(len(obs))]
 
-    # perform optimal interpolation
-        tmp_output = gridpp.optimal_interpolation(
-            grid,
-            background,
-            points,
-            tmp_obs["biasc"].to_numpy(),
-            obs_to_background_variance_ratio,
-            pobs,
-            structure,
-            max_points,
-        )
+    else:
+        q = Queue()
+        processes = []
+        outputd = {}
 
-        # Mask based on LSM(lc) so that modifications over sea are zero
-        ###xo = ma.masked_array(tmp_output, mask = lc0)
-        ###tmp_output = xo.filled(0)
-        print("min_grid",round(np.amin(tmp_output),1), "max_grid:", round(np.amax(tmp_output),1))
+        for i in range(len(obs)):
+            processes.append(Process(target=interpolate_single_time, args=(grid, background, points, obs, obs_to_background_variance_ratio, pobs, structure, max_points, i, q)))
+            processes[-1].start()
 
-        output.append(tmp_output)
+        for p in processes:
+            # get return values from queue
+            # they might be in any order (non-consecutive)
+            ret = q.get()
+            outputd[ret[0]] = ret[1]
+
+        for p in processes:
+            p.join()
+
+        for i in range(len(obs)):
+            # sort return values from 0 to 8
+            output.append(outputd[i])
+
     return output
 
 def train_data(args, points, obs, grid, topo, ws, rh, t2, wg, cl, ps, wd, q2, forecasttime):
