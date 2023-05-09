@@ -11,7 +11,6 @@ import xarray as xr
 from scipy.interpolate import RegularGridInterpolator
 import fsspec
 import os
-import matplotlib.pylab as mpl
 import time
 from sklearn.ensemble import GradientBoostingRegressor
 import joblib
@@ -725,6 +724,8 @@ def main():
     write_grib(args, analysistime, forecasttime, output)
 
     """
+    import matplotlib.pylab as mpl
+
     # plot diff
     for j in range(0,len(diff)):
         vmin = -5
