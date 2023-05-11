@@ -412,10 +412,6 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
     Because there's ~1h delay between the mnwc analysistime and when the data is available for the users,
     the time-parameters for the output data is modified such that new analysistime is +1h and the mnwc data leadtimes are reduced by -1h
     """
-    #print(analysistime)
-    new_atime = analysistime + datetime.timedelta(hours=1)
-    #print("new atime" , new_atime)
-    #print(forecasttime)
 
     pdtn=0
     tosp=None
@@ -455,8 +451,8 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
         ecc.codes_set(h, "LoVInDegrees", 15)
         ecc.codes_set(h, "latitudeOfSouthernPoleInDegrees", -90)
         ecc.codes_set(h, "longitudeOfSouthernPoleInDegrees", 0)
-        ecc.codes_set(h, "dataDate", int(new_atime.strftime("%Y%m%d")))
-        ecc.codes_set(h, "dataTime", int(new_atime.strftime("%H%M")))
+        ecc.codes_set(h, "dataDate", int(analysistime.strftime("%Y%m%d")))
+        ecc.codes_set(h, "dataTime", int(analysistime.strftime("%H%M")))
         ecc.codes_set(
         h, "forecastTime", int((forecasttime[j] - analysistime).total_seconds() / 3600)
         )
