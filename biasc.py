@@ -408,11 +408,6 @@ def read_obs(args, fcstime, grid, lc, mnwc):
 
 
 def write_grib_message(fp, args, analysistime, forecasttime, data):
-    """
-    Because there's ~1h delay between the mnwc analysistime and when the data is available for the users,
-    the time-parameters for the output data is modified such that new analysistime is +1h and the mnwc data leadtimes are reduced by -1h
-    """
-
     pdtn=0
     tosp=None
     if args.parameter == "humidity":
@@ -436,6 +431,13 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
     # Store different time steps as grib msgs
     for j in range(0,len(data)):
         tdata = data[j]
+        forecastTime = int((forecasttime[j] - analysistime).total_seconds() / 3600)
+
+        if tosp == 2:
+            # for aggregated parameters forecastTime is the start of the
+            # aggregation period
+            forecastTime -= 1
+
         h = ecc.codes_grib_new_from_samples("regular_ll_sfc_grib2")
         ecc.codes_set(h, "gridType", "lambert")
         ecc.codes_set(h, "shapeOfTheEarth", 5)
@@ -453,9 +455,7 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
         ecc.codes_set(h, "longitudeOfSouthernPoleInDegrees", 0)
         ecc.codes_set(h, "dataDate", int(analysistime.strftime("%Y%m%d")))
         ecc.codes_set(h, "dataTime", int(analysistime.strftime("%H%M")))
-        ecc.codes_set(
-        h, "forecastTime", int((forecasttime[j] - analysistime).total_seconds() / 3600)
-        )
+        ecc.codes_set(h, "forecastTime", forecastTime)
         ecc.codes_set(h, "centre", 86)
         ecc.codes_set(h, "generatingProcessIdentifier", 203)
         ecc.codes_set(h, "discipline", 0)
@@ -464,11 +464,11 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
         ecc.codes_set(h, "productDefinitionTemplateNumber", pdtn)
         if tosp is not None:
             ecc.codes_set(h, "typeOfStatisticalProcessing", tosp)
+            ecc.codes_set(h, "lengthOfTimeRange", 1)
         ecc.codes_set(h, "typeOfFirstFixedSurface", 103)
         ecc.codes_set(h, "scaledValueOfFirstFixedSurface", levelvalue)
         ecc.codes_set(h, "packingType", "grid_ccsds")
-        ecc.codes_set(h, "indicatorOfUnitOfTimeRange", 0)
-        ecc.codes_set(h, "forecastTime", j)
+        ecc.codes_set(h, "indicatorOfUnitOfTimeRange", 1) # hours
         ecc.codes_set(h, "typeOfGeneratingProcess", 2)  # deterministic forecast
         ecc.codes_set(h, "typeOfProcessedData", 2)  # analysis and forecast products
         ecc.codes_set_values(h, tdata.flatten())
@@ -754,6 +754,9 @@ def main():
         output.append(tmp_output)
 
 
+    # Remove analysistime (leadtime=0), because correction is not made for that time
+    forecasttime.pop(0)
+    assert len(forecasttime) == len(output)
     write_grib(args, analysistime, forecasttime, output)
 
     """
