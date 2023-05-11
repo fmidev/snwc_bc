@@ -745,9 +745,11 @@ def main():
         tmp_output = background[j+1] - diff[j]
         # Implement simple QC thresholds
         if args.parameter == "humidity":
-            tmp_output = np.clip(tmp_output, 0, 100)
+            tmp_output = np.clip(tmp_output, 5, 100) # min RH 5% !
             tmp_output = tmp_output/100
-        elif args.parameter == "windspeed" or args.parameter == "gust":
+        elif args.parameter == "windspeed":
+            tmp_output = np.clip(tmp_output, 0, 38) # max ws same as in oper qc: 38m/s 
+        elif args.parameter == "gust":
             tmp_output = np.clip(tmp_output, 0, 50)
         elif args.parameter == "temperature":
             tmp_output = tmp_output + 273.15
