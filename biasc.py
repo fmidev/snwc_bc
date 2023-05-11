@@ -420,19 +420,27 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
     if args.parameter == "humidity":
         levelvalue = 2
         pcat = 1
-        pnum = 1
+        pnum = 192
+        pdtn=0
+        tosp=0
     elif args.parameter == "temperature":
         levelvalue = 2
         pnum = 0
         pcat = 0
+        pdtn=0
+        tosp=0
     elif args.parameter == "windspeed":
         pcat = 2
         pnum = 1
         levelvalue = 10
+        pdtn=0
+        tosp=0
     elif args.parameter == "gust":
         levelvalue = 10
         pnum = 22
         pcat = 2
+        pdtn=8
+        tosp=2
     # Store different time steps as grib msgs
     for j in range(0,len(data)):
         tdata = data[j]
@@ -461,6 +469,8 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
         ecc.codes_set(h, "discipline", 0)
         ecc.codes_set(h, "parameterCategory", pcat)
         ecc.codes_set(h, "parameterNumber", pnum)
+        ecc.codes_set(h, "productDefinitionTemplateNumber", pdtn)
+        ecc.codes_set(h, "typeOfStatisticalProcessing", tosp)
         ecc.codes_set(h, "typeOfFirstFixedSurface", 103)
         ecc.codes_set(h, "scaledValueOfFirstFixedSurface", levelvalue)
         ecc.codes_set(h, "packingType", "grid_ccsds")
