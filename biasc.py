@@ -242,7 +242,7 @@ def read_ml_grid(args):
 
     return ws, rh, t2, wg, cl, ps, wd, q2
 
-def read_conventional_obs(args, fcstime, mnwc):
+def read_conventional_obs(args, fcstime, mnwc, analysistime):
     parameter = args.parameter
     # read observations for "analysis time" == leadtime 1
     obstime = fcstime[1]
@@ -273,8 +273,17 @@ def read_conventional_obs(args, fcstime, mnwc):
 
         resp = requests.get(url)
 
-        if resp.status_code != 200:
+        testitmp = []
+
+        if resp.status_code != 200 or resp.json == testitmp:
             print("Not able to connect Smartmet server for observations, original MNWC fields are saved")
+            # Remove analysistime (leadtime=0), because correction is not made for that time
+            fcstime.pop(0)
+            mnwc = mnwc[1:]
+            if parameter == "humidity":
+                mnwc = mnwc/100
+            elif parameter == "temperature":
+                mnwc = mnwc + 273.15
             write_grib(args, analysistime, fcstime, mnwc)
             sys.exit(1)
         trad_obs += resp.json()
@@ -292,6 +301,12 @@ def read_conventional_obs(args, fcstime, mnwc):
 
     if count == 0:
         print("Number of observations from Smartmet serve is 0, original MNWC fields are saved")
+        fcstime.pop(0)
+        mnwc = mnwc[1:]
+        if parameter == "humidity":
+            mnwc = mnwc/100
+        elif parameter == "temperature":
+            mnwc = mnwc + 273.15
         write_grib(args, analysistime, fcstime, mnwc)
         sys.exit(1)
 
@@ -314,12 +329,13 @@ def read_netatmo_obs(args, fcstime):
 
     crowd_obs = None
 
-    if resp.status_code != 200:
+    testitmp = []
+
+    if resp.status_code != 200 or resp.json() == testitmp:
         print("Error fetching NetAtmo data")
     else:
         crowd_obs = resp.json()
-
-    print("Got {} crowd sourced obs stations".format(len(crowd_obs)))
+        print("Got {} crowd sourced obs stations".format(len(crowd_obs)))
 
     obs = None
 
@@ -371,13 +387,13 @@ def read_netatmo_obs(args, fcstime):
     return obs
 
 
-def read_obs(args, fcstime, grid, lc, mnwc):
+def read_obs(args, fcstime, grid, lc, mnwc, analysistime):
     """Read observations from smartmet server"""
 
     # read observations for "analysis" time == leadtime 1
     # obstime = fcstime[1]
 
-    obs = read_conventional_obs(args, fcstime, mnwc)
+    obs = read_conventional_obs(args, fcstime, mnwc, analysistime)
 
     # for temperature we also have netatmo stations
     # these are optional
@@ -717,7 +733,7 @@ def main():
     # Read observations from smartmet server
     # Use correct time! == latest obs hour ==  forecasttime[1]
 
-    points, obs = read_obs(args, forecasttime, grid, lc, background)
+    points, obs = read_obs(args, forecasttime, grid, lc, background, analysistime)
 
     ot = time.time()
     timedif = ot-et
