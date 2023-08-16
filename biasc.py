@@ -449,11 +449,9 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
         tdata = data[j]
         forecastTime = int((forecasttime[j] - analysistime).total_seconds() / 3600)
 
-        if tosp == 2:
-            # for aggregated parameters forecastTime is the start of the
-            # aggregation period
-            forecastTime -= 1
-
+        assert (tosp is None and j + 1 == forecastTime) or (
+            tosp == 2 and j == forecastTime
+        )
         h = ecc.codes_grib_new_from_samples("regular_ll_sfc_grib2")
         ecc.codes_set(h, "gridType", "lambert")
         ecc.codes_set(h, "shapeOfTheEarth", 5)
