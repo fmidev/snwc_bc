@@ -17,8 +17,11 @@ import joblib
 import copy
 import numpy.ma as ma
 import warnings
+from flatten_json import flatten
 from multiprocessing import Process, Queue
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
+
 
 def parse_command_line():
     parser = argparse.ArgumentParser()
@@ -44,7 +47,6 @@ def parse_command_line():
 
     allowed_params = ["temperature", "humidity", "windspeed", "gust"]
     if args.parameter not in allowed_params:
-
         print("Error: parameter must be one of: {}".format(allowed_params))
         sys.exit(1)
 
@@ -134,8 +136,8 @@ def read_grib(gribfile, read_coordinates=False):
     if gribfile.startswith("s3://"):
         wrk_gribfile = read_file_from_s3(gribfile)
 
-    lons=[]
-    lats=[]
+    lons = []
+    lats = []
 
     with open(wrk_gribfile) as fp:
         # print("Reading {}".format(gribfile))
@@ -150,7 +152,7 @@ def read_grib(gribfile, read_coordinates=False):
             nj = ecc.codes_get_long(gh, "Ny")
             dataDate = ecc.codes_get_long(gh, "dataDate")
             dataTime = ecc.codes_get_long(gh, "dataTime")
-            forecastTime = ecc.codes_get_long(gh, "forecastTime")
+            forecastTime = ecc.codes_get_long(gh, "endStep")
             analysistime = datetime.datetime.strptime(
                 "{}.{:04d}".format(dataDate, dataTime), "%Y%m%d.%H%M"
             )
@@ -178,19 +180,24 @@ def read_grib(gribfile, read_coordinates=False):
                         lons.append(lon)
                         lats.append(lat)
 
-
         if read_coordinates == False and len(values) == 1:
-            return None, None, np.asarray(values).reshape(nj,ni), analysistime, forecasttime
+            return (
+                None,
+                None,
+                np.asarray(values).reshape(nj, ni),
+                analysistime,
+                forecasttime,
+            )
         elif read_coordinates == False and len(values) > 1:
             return None, None, np.asarray(values), analysistime, forecasttime
         else:
             return (
-	np.asarray(lons).reshape(nj, ni),
-        np.asarray(lats).reshape(nj, ni),
-        np.asarray(values),
-        analysistime,
-        forecasttime,
-    )
+                np.asarray(lons).reshape(nj, ni),
+                np.asarray(lats).reshape(nj, ni),
+                np.asarray(values),
+                analysistime,
+                forecasttime,
+            )
 
 
 def read_grid(args):
@@ -211,20 +218,20 @@ def read_grid(args):
     _, _, lc, _, _ = read_grib(args.landseacover_data, False)
 
     # modify  geopotential to height and use just the first grib message, since the topo & lc fields are static
-    topo = topo/9.81
+    topo = topo / 9.81
     topo = topo[0]
     lc = lc[0]
 
     if args.parameter == "temperature":
         vals = vals - 273.15
     elif args.parameter == "humidity":
-        vals = vals*100
+        vals = vals * 100
 
     grid = gridpp.Grid(lats, lons, topo, lc)
     return grid, lons, lats, vals, analysistime, forecasttime, lc, topo
 
-def read_ml_grid(args):
 
+def read_ml_grid(args):
     _, _, ws, _, _ = read_grib(args.ws_data, False)
     _, _, rh, _, _ = read_grib(args.rh_data, False)
     _, _, q2, _, _ = read_grib(args.q2_data, False)
@@ -236,26 +243,29 @@ def read_ml_grid(args):
 
     # change parameter units:
     rh = rh * 100
-    t2 = t2 -273.15
-    ps = ps/100
-    cl = np.around(cl/0.125,0)
+    t2 = t2 - 273.15
+    ps = ps / 100
+    cl = np.around(cl / 0.125, 0)
 
     return ws, rh, t2, wg, cl, ps, wd, q2
+
 
 def read_conventional_obs(args, fcstime, mnwc, analysistime):
     parameter = args.parameter
     # read observations for "analysis time" == leadtime 1
     obstime = fcstime[1]
-    #print("Observations are from time:", obstime)
+    # print("Observations are from time:", obstime)
 
     timestr = obstime.strftime("%Y%m%d%H%M%S")
     trad_obs = []
 
-    # define obs parameter names used in observation database, for ws the potential ws values are used for Finland 
+    # define obs parameter names used in observation database, for ws the potential ws values are used for Finland
     if parameter == "temperature":
         obs_parameter = "TA_PT1M_AVG"
     elif parameter == "windspeed":
-        obs_parameter = "WSP_PT10M_AVG" # potential wind speed available for Finnish stations
+        obs_parameter = (
+            "WSP_PT10M_AVG"  # potential wind speed available for Finnish stations
+        )
     elif parameter == "gust":
         obs_parameter = "WG_PT1H_MAX"
     elif parameter == "humidity":
@@ -274,25 +284,31 @@ def read_conventional_obs(args, fcstime, mnwc, analysistime):
         resp = requests.get(url)
 
         testitmp = []
+        testitmp2 = []
+        if resp.status_code == 200:
+            testitmp2 = pd.DataFrame(resp.json())
+            # test if all the retrieved observations are Nan
+            testitmp2 = testitmp2[obs_parameter].isnull().all()
 
-        if resp.status_code != 200 or resp.json == testitmp:
-            print("Not able to connect Smartmet server for observations, original MNWC fields are saved")
+        if resp.status_code != 200 or testitmp2 == True or resp.json == testitmp:
+            print(
+                "Not able to connect Smartmet server for observations, original MNWC fields are saved"
+            )
             # Remove analysistime (leadtime=0), because correction is not made for that time
             fcstime.pop(0)
             mnwc = mnwc[1:]
             if parameter == "humidity":
-                mnwc = mnwc/100
+                mnwc = mnwc / 100
             elif parameter == "temperature":
                 mnwc = mnwc + 273.15
             write_grib(args, analysistime, fcstime, mnwc)
             sys.exit(1)
         trad_obs += resp.json()
 
-
     obs = pd.DataFrame(trad_obs)
     # rename observation column if WS, otherwise WS and WSP won't work
-    if parameter == "windspeed": # merge columns for WSP and WS
-       obs["WSP_PT10M_AVG"] = obs["WSP_PT10M_AVG"].fillna(obs["WS_PT10M_AVG"])
+    if parameter == "windspeed":  # merge columns for WSP and WS
+        obs["WSP_PT10M_AVG"] = obs["WSP_PT10M_AVG"].fillna(obs["WS_PT10M_AVG"])
 
     obs = obs.rename(columns={"fmisid": "station_id"})
 
@@ -300,47 +316,65 @@ def read_conventional_obs(args, fcstime, mnwc, analysistime):
     print("Got {} traditional obs stations for time {}".format(count, obstime))
 
     if count == 0:
-        print("Number of observations from Smartmet serve is 0, original MNWC fields are saved")
+        print(
+            "Number of observations from Smartmet serve is 0, original MNWC fields are saved"
+        )
         fcstime.pop(0)
         mnwc = mnwc[1:]
         if parameter == "humidity":
-            mnwc = mnwc/100
+            mnwc = mnwc / 100
         elif parameter == "temperature":
             mnwc = mnwc + 273.15
         write_grib(args, analysistime, fcstime, mnwc)
         sys.exit(1)
 
-    #print(obs.head(5))
-    print("min obs:",min(obs.iloc[:,5]))
-    print("max obs:",max(obs.iloc[:,5]))
+    # print(obs.head(5))
+    print("min obs:", min(obs.iloc[:, 5]))
+    print("max obs:", max(obs.iloc[:, 5]))
     return obs
 
 
 def read_netatmo_obs(args, fcstime):
-    # read observations for "analysis time" == leadtime 1
+    # read Tiuha db NetAtmo observations for "analysis time" == leadtime 1
+    snwc1_key = os.environ.get("SNWC1_KEY")
+    os.environ["NO_PROXY"] = "tiuha-dev.apps.ock.fmi.fi"
     obstime = fcstime[1]
 
-    url = "http://smartmet.fmi.fi/timeseries?producer=NetAtmo&tz=gmt&precision=auto&starttime={}&endtime={}&param=station_id,longitude,latitude,utctime,temperature&format=json&data_quality=1&keyword=snwc".format(
-        (obstime - datetime.timedelta(minutes=10)).strftime("%Y%m%d%H%M%S"),
-        obstime.strftime("%Y%m%d%H%M%S"),
+    url = "https://tiuha-dev.apps.ock.fmi.fi/v1/edr/collections/netatmo-air_temperature/cube?bbox=4,54,32,71.5&start={}Z&end={}Z".format(
+        (obstime - datetime.timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%S"),
+        obstime.strftime("%Y-%m-%dT%H:%M:%S"),
     )
-
-    resp = requests.get(url)
+    headers = {"Authorization": f"Basic {snwc1_key}"}
+    # os.environ['NO_PROXY'] = 'tiuha-dev.apps.ock.fmi.fi'
+    resp = requests.get(url, headers=headers)
 
     crowd_obs = None
-
     testitmp = []
 
     if resp.status_code != 200 or resp.json() == testitmp:
         print("Error fetching NetAtmo data")
     else:
         crowd_obs = resp.json()
-        print("Got {} crowd sourced obs stations".format(len(crowd_obs)))
+        # print("Got {} crowd sourced obs stations".format(len(crowd_obs)))
 
     obs = None
 
     if crowd_obs is not None:
-        obs = pd.DataFrame(crowd_obs)
+        flattened_data = [flatten(feature) for feature in crowd_obs["features"]]
+        obs = pd.DataFrame(flattened_data)
+        obs.drop(obs.columns[[0, 1, 5, 6, 7, 9, 10, 11, 12]], axis=1, inplace=True)
+        obs = obs.rename(
+            columns={
+                "geometry_coordinates_0": "longitude",
+                "geometry_coordinates_1": "latitude",
+                "geometry_coordinates_2": "station_id",
+                "properties_resultTime": "utctime",
+                "properties_result": "temperature",
+            }
+        )
+        # Remove duplicated observations/station by removing duplicated lat/lon values and keep the first value only
+        obs = obs[~obs.duplicated(subset=["latitude", "longitude"], keep="first")]
+        print("Got {} crowd sourced obs stations".format(len(obs)))
 
         # netatmo obs do not contain elevation information, but we need thatn
         # to have the best possible result from optimal interpolation
@@ -348,7 +382,7 @@ def read_netatmo_obs(args, fcstime):
         # use digital elevation map data to interpolate elevation information
         # to all netatmo station points
 
-        #print("Interpolating elevation to NetAtmo stations")
+        # print("Interpolating elevation to NetAtmo stations")
         dem = xr.open_rasterio(args.dem_data)
 
         # dem is projected to lambert, our obs data is in latlon
@@ -376,15 +410,54 @@ def read_netatmo_obs(args, fcstime):
         obs["elevation"] = interp(points)
 
         obs = obs.drop(columns=["x", "y"])
-        #print(obs.head(5))
+        # print(obs.head(5))
         # reorder/rename columns of the NetAtmo df to match with synop data
-        obs = obs[['station_id', 'longitude', 'latitude', 'utctime', 'elevation', 'temperature']]
-        obs.rename(columns = {'temperature':'TA_PT1M_AVG'}, inplace = True)
-        #print(obs.head(10))
-        print("min NetAtmo obs:",min(obs.iloc[:,5]))
-        print("max NetAtmo obs:",max(obs.iloc[:,5]))
+        obs = obs[
+            [
+                "station_id",
+                "longitude",
+                "latitude",
+                "utctime",
+                "elevation",
+                "temperature",
+            ]
+        ]
+        obs.rename(columns={"temperature": "TA_PT1M_AVG"}, inplace=True)
+        # print(obs.head(10))
+        print("min NetAtmo obs:", min(obs.iloc[:, 5]))
+        print("max NetAtmo obs:", max(obs.iloc[:, 5]))
 
     return obs
+
+
+def detect_outliers_zscore(args, fcstime, obs_data):
+    # remove outliers based on zscore with separate thresholds for upper and lower tail
+    if args.parameter == "humidity":
+        upper_threshold = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+        lower_threshold = [-4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5]
+    elif args.parameter == "temperature":
+        lower_threshold = [-6, -6, -5, -4, -4, -4, -4, -4, -4, -5, -6, -6]
+        upper_threshold = [2.5, 2.5, 2.5, 3, 4, 5, 5, 5, 3, 2.5, 2.5, 2.5]
+    elif args.parameter == "windspeed" or args.parameter == "gust":
+        upper_threshold = [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7]
+        lower_threshold = [-4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4]
+
+    thres_month = fcstime.month
+    up_thres = upper_threshold[thres_month - 1]
+    low_thres = lower_threshold[thres_month - 1]
+
+    outliers = []
+
+    tmpobs = obs_data.iloc[:, 5]
+    mean = np.mean(tmpobs)
+    std = np.std(tmpobs)
+    for i in tmpobs:
+        z = (i - mean) / std
+        if z > up_thres or z < low_thres:
+            outliers.append(i)
+    dataout = obs_data[~obs_data.iloc[:, 5].isin(outliers)]
+    # print(obs_data[obs_data.iloc[:,5].isin(outliers)])
+    return outliers, dataout
 
 
 def read_obs(args, fcstime, grid, lc, mnwc, analysistime):
@@ -398,13 +471,19 @@ def read_obs(args, fcstime, grid, lc, mnwc, analysistime):
     # for temperature we also have netatmo stations
     # these are optional
 
-
     if args.parameter == "temperature":
         netatmo = read_netatmo_obs(args, fcstime)
         if netatmo is not None:
             obs = pd.concat((obs, netatmo))
 
-        #obs["temperature"] += 273.15
+        # obs["temperature"] += 273.15
+
+    outliers, obs = detect_outliers_zscore(args, fcstime[1], obs)
+    print("removed " + str(len(outliers)) + " outliers from observations")
+    # print(outliers)
+
+    print("min of QC obs:", min(obs.iloc[:, 5]))
+    print("max of QC obs:", max(obs.iloc[:, 5]))
 
     points1 = gridpp.Points(
         obs["latitude"].to_numpy(),
@@ -424,8 +503,8 @@ def read_obs(args, fcstime, grid, lc, mnwc, analysistime):
 
 
 def write_grib_message(fp, args, analysistime, forecasttime, data):
-    pdtn=0
-    tosp=None
+    pdtn = 0
+    tosp = None
     if args.parameter == "humidity":
         levelvalue = 2
         pcat = 1
@@ -442,15 +521,15 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
         levelvalue = 10
         pnum = 22
         pcat = 2
-        pdtn=8
-        tosp=2
+        pdtn = 8
+        tosp = 2
     # Store different time steps as grib msgs
-    for j in range(0,len(data)):
+    for j in range(0, len(data)):
         tdata = data[j]
         forecastTime = int((forecasttime[j] - analysistime).total_seconds() / 3600)
 
         assert (tosp is None and j + 1 == forecastTime) or (
-            tosp == 2 and j == forecastTime
+            tosp == 2 and j +1 == forecastTime
         )
         h = ecc.codes_grib_new_from_samples("regular_ll_sfc_grib2")
         ecc.codes_set(h, "gridType", "lambert")
@@ -482,7 +561,7 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
         ecc.codes_set(h, "typeOfFirstFixedSurface", 103)
         ecc.codes_set(h, "scaledValueOfFirstFixedSurface", levelvalue)
         ecc.codes_set(h, "packingType", "grid_ccsds")
-        ecc.codes_set(h, "indicatorOfUnitOfTimeRange", 1) # hours
+        ecc.codes_set(h, "indicatorOfUnitOfTimeRange", 1)  # hours
         ecc.codes_set(h, "typeOfGeneratingProcess", 2)  # deterministic forecast
         ecc.codes_set(h, "typeOfProcessedData", 2)  # analysis and forecast products
         ecc.codes_set_values(h, tdata.flatten())
@@ -491,7 +570,6 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
 
 
 def write_grib(args, analysistime, forecasttime, data):
-
     if args.output.startswith("s3://"):
         openfile = fsspec.open(
             "simplecache::{}".format(args.output),
@@ -512,21 +590,35 @@ def write_grib(args, analysistime, forecasttime, data):
     print(f"Wrote file {args.output}")
 
 
-def interpolate_single_time(grid, background, points, obs,obs_to_background_variance_ratio, pobs, structure, max_points, idx, q):
-
+def interpolate_single_time(
+    grid,
+    background,
+    points,
+    obs,
+    obs_to_background_variance_ratio,
+    pobs,
+    structure,
+    max_points,
+    idx,
+    q,
+):
     # perform optimal interpolation
     tmp_output = gridpp.optimal_interpolation(
-            grid,
-            background,
-            points,
-            obs[idx]["biasc"].to_numpy(),
-            obs_to_background_variance_ratio,
-            pobs,
-            structure,
-            max_points,
-        )
+        grid,
+        background,
+        points,
+        obs[idx]["biasc"].to_numpy(),
+        obs_to_background_variance_ratio,
+        pobs,
+        structure,
+        max_points,
+    )
 
-    print("step {} min grid: {:.1f} max grid: {:.1f}".format(idx, np.amin(tmp_output), np.amax(tmp_output)))
+    print(
+        "step {} min grid: {:.1f} max grid: {:.1f}".format(
+            idx, np.amin(tmp_output), np.amax(tmp_output)
+        )
+    )
 
     if q is not None:
         # return index and output, so that the results can
@@ -560,7 +652,21 @@ def interpolate(grid, points, background, obs, args, lc):
     obs_to_background_variance_ratio = np.full(points.size(), 0.1)
 
     if args.disable_multiprocessing:
-        output = [interpolate_single_time(grid, background, points, obs, obs_to_background_variance_ratio, pobs, structure, max_points, x, None) for x in range(len(obs))]
+        output = [
+            interpolate_single_time(
+                grid,
+                background,
+                points,
+                obs,
+                obs_to_background_variance_ratio,
+                pobs,
+                structure,
+                max_points,
+                x,
+                None,
+            )
+            for x in range(len(obs))
+        ]
 
     else:
         q = Queue()
@@ -568,7 +674,23 @@ def interpolate(grid, points, background, obs, args, lc):
         outputd = {}
 
         for i in range(len(obs)):
-            processes.append(Process(target=interpolate_single_time, args=(grid, background, points, obs, obs_to_background_variance_ratio, pobs, structure, max_points, i, q)))
+            processes.append(
+                Process(
+                    target=interpolate_single_time,
+                    args=(
+                        grid,
+                        background,
+                        points,
+                        obs,
+                        obs_to_background_variance_ratio,
+                        pobs,
+                        structure,
+                        max_points,
+                        i,
+                        q,
+                    ),
+                )
+            )
             processes[-1].start()
 
         for p in processes:
@@ -586,7 +708,10 @@ def interpolate(grid, points, background, obs, args, lc):
 
     return output
 
-def train_data(args, points, obs, grid, topo, ws, rh, t2, wg, cl, ps, wd, q2, forecasttime):
+
+def train_data(
+    args, points, obs, grid, topo, ws, rh, t2, wg, cl, ps, wd, q2, forecasttime
+):
     data = pd.DataFrame()
     tmp_data = pd.DataFrame()
 
@@ -599,7 +724,7 @@ def train_data(args, points, obs, grid, topo, ws, rh, t2, wg, cl, ps, wd, q2, fo
         forecast = gridpp.nearest(grid, points, ws[1])
     elif args.parameter == "gust":
         forecast = gridpp.nearest(grid, points, wg[1])
-        #print("havainto:", obs.iloc[:, 5])
+        # print("havainto:", obs.iloc[:, 5])
     bias = forecast - obs.iloc[:, 5]
 
     # Calculate the elevation difference between the model and the obs points
@@ -607,7 +732,7 @@ def train_data(args, points, obs, grid, topo, ws, rh, t2, wg, cl, ps, wd, q2, fo
     ElevD = model_elev - obs["elevation"]
 
     # MNWC analystime 0h is not used at all, start from forecasttime 1 (used as observation analysis)
-    for j in range(1,len(forecasttime)):
+    for j in range(1, len(forecasttime)):
         tmp_data["bias"] = bias
         tmp_data["obs_lat"] = obs["latitude"]
         tmp_data["obs_lon"] = obs["longitude"]
@@ -622,50 +747,123 @@ def train_data(args, points, obs, grid, topo, ws, rh, t2, wg, cl, ps, wd, q2, fo
         tmp_data["Q2M"] = gridpp.nearest(grid, points, q2[j])
         tmp_data["leadtime"] = j
         tmp_data["forecasttime"] = forecasttime[j]
-        data = data.append(tmp_data,ignore_index=True)
-        #data = pd.concat([data,tmp_data],join="inner")
-        #print("tmp:",tmp_points)
+        data = data.append(tmp_data, ignore_index=True)
+        # data = pd.concat([data,tmp_data],join="inner")
+        # print("tmp:",tmp_points)
     return data
+
 
 # Modify time to sin/cos representation
 def encode(data, col, max_val):
-    data[col + "_sin"] = np.sin(2 * np.pi * data[col]/max_val)
-    data[col + "_cos"] = np.cos(2 * np.pi * data[col]/max_val)
+    data[col + "_sin"] = np.sin(2 * np.pi * data[col] / max_val)
+    data[col + "_cos"] = np.cos(2 * np.pi * data[col] / max_val)
     return data
+
 
 # Modify dataframe for xgboost model according parameter
 def modify(data, param):
     data = data.assign(month=data.forecasttime.dt.month)
     data = data.assign(hour=data.forecasttime.dt.hour)
-    data = encode(data, 'month', 12)
-    data = encode(data, 'hour', 24)
-    data = data.drop(['month','hour'], axis=1)
+    data = encode(data, "month", 12)
+    data = encode(data, "hour", 24)
+    data = data.drop(["month", "hour"], axis=1)
     # data = data.dropna()
     if param == "temperature":
-        data = data.drop(["GMAX","D10M"], axis=1)
-        data = data[['leadtime', 'T2M', 'S10M', 'RH2M', 'PMSL', 'Q2M', 'CCLOW', 'obs_lat',
-       'obs_lon', 'ElevD', 'bias', 'month_sin', 'month_cos', 'hour_sin', 'hour_cos']]
-        data.rename(columns = {'bias':'T1bias'}, inplace = True)
+        data = data.drop(["GMAX", "D10M"], axis=1)
+        data = data[
+            [
+                "leadtime",
+                "T2M",
+                "S10M",
+                "RH2M",
+                "PMSL",
+                "Q2M",
+                "CCLOW",
+                "obs_lat",
+                "obs_lon",
+                "ElevD",
+                "bias",
+                "month_sin",
+                "month_cos",
+                "hour_sin",
+                "hour_cos",
+            ]
+        ]
+        data.rename(columns={"bias": "T1bias"}, inplace=True)
     elif param == "windspeed":
-        data = data.drop(["RH2M","Q2M"], axis=1)
-        data = data[['leadtime', 'D10M', 'T2M', 'S10M', 'PMSL', 'CCLOW', 'GMAX', 'obs_lat',
-       'obs_lon', 'ElevD', 'bias', 'month_sin', 'month_cos', 'hour_sin', 'hour_cos']]
-        data.rename(columns = {'bias':'WS1bias'}, inplace = True)
+        data = data.drop(["RH2M", "Q2M"], axis=1)
+        data = data[
+            [
+                "leadtime",
+                "D10M",
+                "T2M",
+                "S10M",
+                "PMSL",
+                "CCLOW",
+                "GMAX",
+                "obs_lat",
+                "obs_lon",
+                "ElevD",
+                "bias",
+                "month_sin",
+                "month_cos",
+                "hour_sin",
+                "hour_cos",
+            ]
+        ]
+        data.rename(columns={"bias": "WS1bias"}, inplace=True)
     elif param == "gust":
-        data = data.drop(["Q2M","CCLOW"], axis=1)
-        data = data[['leadtime', 'D10M', 'T2M', 'S10M', 'RH2M', 'PMSL', 'GMAX', 'obs_lat',
-       'obs_lon', 'ElevD', 'bias', 'month_sin', 'month_cos', 'hour_sin', 'hour_cos']]
-        data.rename(columns = {'bias':'WG1bias'}, inplace = True)
+        data = data.drop(["Q2M", "CCLOW"], axis=1)
+        data = data[
+            [
+                "leadtime",
+                "D10M",
+                "T2M",
+                "S10M",
+                "RH2M",
+                "PMSL",
+                "GMAX",
+                "obs_lat",
+                "obs_lon",
+                "ElevD",
+                "bias",
+                "month_sin",
+                "month_cos",
+                "hour_sin",
+                "hour_cos",
+            ]
+        ]
+        data.rename(columns={"bias": "WG1bias"}, inplace=True)
     elif param == "humidity":
-        data = data.drop(["GMAX","D10M"], axis=1)
-        data = data[['leadtime', 'T2M', 'S10M', 'RH2M', 'PMSL', 'Q2M', 'CCLOW', 'obs_lat',
-       'obs_lon', 'ElevD', 'bias', 'month_sin', 'month_cos', 'hour_sin', 'hour_cos']]
-        data.rename(columns = {'bias':'RH1bias'}, inplace = True)
+        data = data.drop(["GMAX", "D10M"], axis=1)
+        data = data[
+            [
+                "leadtime",
+                "T2M",
+                "S10M",
+                "RH2M",
+                "PMSL",
+                "Q2M",
+                "CCLOW",
+                "obs_lat",
+                "obs_lon",
+                "ElevD",
+                "bias",
+                "month_sin",
+                "month_cos",
+                "hour_sin",
+                "hour_cos",
+            ]
+        ]
+        data.rename(columns={"bias": "RH1bias"}, inplace=True)
 
     # modify data precision from f64 to f32
-    data[data.select_dtypes(np.float64).columns] = data.select_dtypes(np.float64).astype(np.float32)
+    data[data.select_dtypes(np.float64).columns] = data.select_dtypes(
+        np.float64
+    ).astype(np.float32)
 
     return data
+
 
 # Calculate ml model point forecast
 def ml_forecast(ml_data, param):
@@ -679,13 +877,13 @@ def ml_forecast(ml_data, param):
     elif param == "humidity":
         mlname = "RH"
 
-    regressor = joblib.load('xgb_' + mlname + '_tuned23.joblib') 
+    regressor = joblib.load("xgb_" + mlname + "_tuned23.joblib")
 
     # Check that you have all the leadtimes (0-9)
-    ajat = sorted(ml_data['leadtime'].unique().tolist())
+    ajat = sorted(ml_data["leadtime"].unique().tolist())
 
     # Leadtime 1 == obs analysis --> ML model not run for this
-    lt1 = ml_data[ml_data['leadtime']==1]
+    lt1 = ml_data[ml_data["leadtime"] == 1]
     ml_data = ml_data[ml_data.leadtime != 1]
 
     # Calculate xgboost based bias correction for the leadtimes 2...x
@@ -701,20 +899,21 @@ def ml_forecast(ml_data, param):
         lt1["biasc"] = lt1["RH1bias"]
 
     # Store data to list where each leadtime is it's own list, first leadtime is the obs analysis
-    ml_results =  []
+    ml_results = []
     ml_results.append(lt1)
 
     # Store bias correected forecast for leadtimes 2...x to list
-    for j in range(1,len(ajat)):
-        lt_tmp = ml_data[ml_data['leadtime']==j+1]
+    for j in range(1, len(ajat)):
+        lt_tmp = ml_data[ml_data["leadtime"] == j + 1]
         ml_results.append(lt_tmp)
 
     return ml_results
 
+
 def main():
     args = parse_command_line()
 
-    #print("Reading NWP data for", args.parameter )
+    # print("Reading NWP data for", args.parameter )
     st = time.time()
     # read in the parameter which is forecasted
     # background contains mnwc values for different leadtimes
@@ -725,8 +924,10 @@ def main():
 
     ws, rh, t2, wg, cl, ps, wd, q2 = read_ml_grid(args)
     et = time.time()
-    timedif = et-st
-    print('Reading NWP data for', args.parameter, 'takes:', round(timedif,1), 'seconds')
+    timedif = et - st
+    print(
+        "Reading NWP data for", args.parameter, "takes:", round(timedif, 1), "seconds"
+    )
 
     # Read observations from smartmet server
     # Use correct time! == latest obs hour ==  forecasttime[1]
@@ -734,10 +935,12 @@ def main():
     points, obs = read_obs(args, forecasttime, grid, lc, background, analysistime)
 
     ot = time.time()
-    timedif = ot-et
-    print('Reading OBS data takes:', round(timedif,1) , 'seconds')
+    timedif = ot - et
+    print("Reading OBS data takes:", round(timedif, 1), "seconds")
     # prepare dataframe for ML code, pandas df
-    data = train_data(args, points, obs, grid, topo, ws, rh, t2, wg, cl, ps, wd, q2, forecasttime)
+    data = train_data(
+        args, points, obs, grid, topo, ws, rh, t2, wg, cl, ps, wd, q2, forecasttime
+    )
 
     # preprocess data
     ml_data = modify(data, args.parameter)
@@ -745,30 +948,29 @@ def main():
     # Produce ML forecast for all the leadtimes
     ml_fcst = ml_forecast(ml_data, args.parameter)
     mlt = time.time()
-    timedif = mlt-ot
-    print('Producing ML forecasts takes:', round(timedif,1) , 'seconds')
+    timedif = mlt - ot
+    print("Producing ML forecasts takes:", round(timedif, 1), "seconds")
     # Interpolate ML point forecasts for bias correction + 0h analysis time
     diff = interpolate(grid, points, background0[0], ml_fcst, args, lc)
     oit = time.time()
-    timedif = oit-mlt
-    print('Interpolating forecasts takes:', round(timedif,1) , 'seconds')
+    timedif = oit - mlt
+    print("Interpolating forecasts takes:", round(timedif, 1), "seconds")
     # calculate the final bias corrected forecast fields: MNWC - bias_correction
     # and convert parameter to T-K or RH-0TO1
     output = []
-    for j in range(0,len(diff)):
-        tmp_output = background[j+1] - diff[j]
+    for j in range(0, len(diff)):
+        tmp_output = background[j + 1] - diff[j]
         # Implement simple QC thresholds
         if args.parameter == "humidity":
-            tmp_output = np.clip(tmp_output, 5, 100) # min RH 5% !
-            tmp_output = tmp_output/100
+            tmp_output = np.clip(tmp_output, 5, 100)  # min RH 5% !
+            tmp_output = tmp_output / 100
         elif args.parameter == "windspeed":
-            tmp_output = np.clip(tmp_output, 0, 38) # max ws same as in oper qc: 38m/s 
+            tmp_output = np.clip(tmp_output, 0, 38)  # max ws same as in oper qc: 38m/s
         elif args.parameter == "gust":
             tmp_output = np.clip(tmp_output, 0, 50)
         elif args.parameter == "temperature":
             tmp_output = tmp_output + 273.15
         output.append(tmp_output)
-
 
     # Remove analysistime (leadtime=0), because correction is not made for that time
     forecasttime.pop(0)
@@ -818,32 +1020,34 @@ def plot(obs, background, output, diff, lons, lats, args):
         obs_parameter = "WG_PT1H_MAX"
     elif args.parameter == "humidity":
         obs_parameter = "RH_PT1M_AVG"
-        output = np.multiply(output,100)
+        output = np.multiply(output, 100)
         vmin1 = -30
         vmax1 = 30
 
     vmin = min(np.amin(background), np.amin(output))
     vmax = min(np.amax(background), np.amax(output))
 
-    #vmin1 =  np.amin(diff)
-    #vmax1 =  np.amax(diff)
+    # vmin1 =  np.amin(diff)
+    # vmax1 =  np.amax(diff)
 
-    for k in range(0,len(diff)):
+    for k in range(0, len(diff)):
         plt.figure(figsize=(13, 6), dpi=80)
 
         plt.subplot(1, 3, 1)
         plt.pcolormesh(
             np.asarray(lons),
             np.asarray(lats),
-            background[k+1],
-            cmap= "Spectral_r", # "RdBu_r",
+            background[k + 1],
+            cmap="Spectral_r",  # "RdBu_r",
             vmin=vmin,
             vmax=vmax,
         )
 
         plt.xlim(0, 35)
         plt.ylim(55, 75)
-        cbar = plt.colorbar(label= "MNWC " + str(k) + "h " + args.parameter , orientation="horizontal")
+        cbar = plt.colorbar(
+            label="MNWC " + str(k) + "h " + args.parameter, orientation="horizontal"
+        )
 
         plt.subplot(1, 3, 2)
         plt.pcolormesh(
@@ -868,21 +1072,28 @@ def plot(obs, background, output, diff, lons, lats, args):
         """
         plt.xlim(0, 35)
         plt.ylim(55, 75)
-        cbar = plt.colorbar(label= "Diff " + str(k) + "h " + args.parameter , orientation="horizontal")
+        cbar = plt.colorbar(
+            label="Diff " + str(k) + "h " + args.parameter, orientation="horizontal"
+        )
 
         plt.subplot(1, 3, 3)
         plt.pcolormesh(
-        np.asarray(lons), np.asarray(lats), output[k], cmap="Spectral_r", vmin=vmin, vmax=vmax
+            np.asarray(lons),
+            np.asarray(lats),
+            output[k],
+            cmap="Spectral_r",
+            vmin=vmin,
+            vmax=vmax,
         )
 
         plt.xlim(0, 35)
         plt.ylim(55, 75)
         cbar = plt.colorbar(
-            label= "XGB " + str(k) + "h " + args.parameter , orientation="horizontal"
+            label="XGB " + str(k) + "h " + args.parameter, orientation="horizontal"
         )
 
-        #plt.show()
-        plt.savefig('all_' + args.parameter + str(k) + '.png')
+        # plt.show()
+        plt.savefig("all_" + args.parameter + str(k) + ".png")
 
 
 if __name__ == "__main__":

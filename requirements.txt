@@ -16,4 +16,4 @@ matplotlib
 scikit-learn
 joblib==1.2.0
 rasterio
- 
+flatten_json
