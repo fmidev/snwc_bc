@@ -434,7 +434,20 @@ def detect_outliers_zscore(args, fcstime, obs_data):
     # remove outliers based on zscore with separate thresholds for upper and lower tail
     if args.parameter == "humidity":
         upper_threshold = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
-        lower_threshold = [-4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5]
+        lower_threshold = [
+            -4.5,
+            -4.5,
+            -4.5,
+            -4.5,
+            -4.5,
+            -4.5,
+            -4.5,
+            -4.5,
+            -4.5,
+            -4.5,
+            -4.5,
+            -4.5,
+        ]
     elif args.parameter == "temperature":
         lower_threshold = [-6, -6, -5, -4, -4, -4, -4, -4, -4, -5, -6, -6]
         upper_threshold = [2.5, 2.5, 2.5, 3, 4, 5, 5, 5, 3, 2.5, 2.5, 2.5]
@@ -528,8 +541,16 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
         tdata = data[j]
         forecastTime = int((forecasttime[j] - analysistime).total_seconds() / 3600)
 
+        # - For non-aggregated parameters, grib2 key 'forecastTime' is the time of the forecast
+        # - For aggregated parameters, it is the start time of the aggregation period. The end of
+        #   the period is defined by 'lengthOfTimeRange'
+        #   Because snwc is in hourly time steps, reduce forecast time by one
+
+        if tosp == 2:
+            forecastTime -= 1
+
         assert (tosp is None and j + 1 == forecastTime) or (
-            tosp == 2 and j +1 == forecastTime
+            tosp == 2 and j == forecastTime
         )
         h = ecc.codes_grib_new_from_samples("regular_ll_sfc_grib2")
         ecc.codes_set(h, "gridType", "lambert")
