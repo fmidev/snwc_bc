@@ -337,6 +337,8 @@ def read_conventional_obs(args, fcstime, mnwc, analysistime):
 def read_netatmo_obs(args, fcstime):
     # read Tiuha db NetAtmo observations for "analysis time" == leadtime 1
     snwc1_key = os.environ.get("SNWC1_KEY")
+    assert snwc1_key is not None, "tiuha api key not find (env variable 'SNWC1_KEY')"
+
     os.environ["NO_PROXY"] = "tiuha-dev.apps.ock.fmi.fi"
     obstime = fcstime[1]
 
@@ -356,7 +358,7 @@ def read_netatmo_obs(args, fcstime):
        testitmp2 = pd.DataFrame(resp.json())
 
     if resp.status_code != 200 or resp.json() == testitmp or len(testitmp2) == 0:
-        print("Error fetching NetAtmo data")
+        print("Error fetching NetAtmo data, status code: {}".format(resp.status_code))
     else:
         crowd_obs = resp.json()
         # print("Got {} crowd sourced obs stations".format(len(crowd_obs)))
