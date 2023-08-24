@@ -350,8 +350,12 @@ def read_netatmo_obs(args, fcstime):
 
     crowd_obs = None
     testitmp = []
+    testitmp2 = []
 
-    if resp.status_code != 200 or resp.json() == testitmp:
+    if resp.status_code == 200:
+       testitmp2 = pd.DataFrame(resp.json())
+
+    if resp.status_code != 200 or resp.json() == testitmp or len(testitmp2) == 0:
         print("Error fetching NetAtmo data")
     else:
         crowd_obs = resp.json()
