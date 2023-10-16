@@ -522,7 +522,7 @@ def read_obs(args, fcstime, grid, lc, mnwc, analysistime):
 
 
 def write_grib_message(fp, args, analysistime, forecasttime, data):
-    pdtn = 0
+    pdtn = 70
     tosp = None
     if args.parameter == "humidity":
         levelvalue = 2
@@ -540,7 +540,7 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
         levelvalue = 10
         pnum = 22
         pcat = 2
-        pdtn = 8
+        pdtn = 72
         tosp = 2
     # Store different time steps as grib msgs
     for j in range(0, len(data)):
@@ -559,6 +559,7 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
             tosp == 2 and j == forecastTime
         )
         h = ecc.codes_grib_new_from_samples("regular_ll_sfc_grib2")
+        ecc.codes_set(h, "tablesVersion", 28)
         ecc.codes_set(h, "gridType", "lambert")
         ecc.codes_set(h, "shapeOfTheEarth", 5)
         ecc.codes_set(h, "Nx", tdata.shape[1])
@@ -571,6 +572,7 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
         ecc.codes_set(h, "Latin1InDegrees", 63.3)
         ecc.codes_set(h, "Latin2InDegrees", 63.3)
         ecc.codes_set(h, "LoVInDegrees", 15)
+        ecc.codes_set(h, "LaDInDegrees", 63.3)
         ecc.codes_set(h, "latitudeOfSouthernPoleInDegrees", -90)
         ecc.codes_set(h, "longitudeOfSouthernPoleInDegrees", 0)
         ecc.codes_set(h, "dataDate", int(analysistime.strftime("%Y%m%d")))
