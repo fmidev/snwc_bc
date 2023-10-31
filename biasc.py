@@ -403,7 +403,7 @@ def read_netatmo_obs(args, fcstime):
         # dem is projected to lambert, our obs data is in latlon
         # transform latlons to projected coordinates
 
-        ll_to_proj = pyproj.Transformer.from_crs("epsg:4326", dem.attrs["crs"])
+        ll_to_proj = pyproj.Transformer.from_crs("epsg:4326", dem.rio.crs)
         xs, ys = ll_to_proj.transform(obs["latitude"], obs["longitude"])
         obs["x"] = xs
         obs["y"] = ys
