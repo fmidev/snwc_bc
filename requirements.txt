@@ -16,4 +16,5 @@ matplotlib
 scikit-learn
 joblib==1.2.0
 rasterio
+rioxarray
 flatten_json

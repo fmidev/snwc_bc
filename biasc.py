@@ -17,6 +17,7 @@ import joblib
 import copy
 import numpy.ma as ma
 import warnings
+import rioxarray
 from flatten_json import flatten
 from multiprocessing import Process, Queue
 
@@ -397,7 +398,7 @@ def read_netatmo_obs(args, fcstime):
         # to all netatmo station points
 
         # print("Interpolating elevation to NetAtmo stations")
-        dem = xr.open_rasterio(args.dem_data)
+        dem = rioxarray.open_rasterio(args.dem_data)
 
         # dem is projected to lambert, our obs data is in latlon
         # transform latlons to projected coordinates
