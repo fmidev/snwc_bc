@@ -118,7 +118,9 @@ def read_file_from_s3(grib_file):
     uri = "simplecache::{}".format(grib_file)
 
     return fsspec.open_local(
-        uri, s3={"anon": True, "client_kwargs": {"endpoint_url": "https://lake.fmi.fi"}}
+        uri,
+        mode="rb",
+        s3={"anon": True, "client_kwargs": {"endpoint_url": "https://lake.fmi.fi"}},
     )
 
 
@@ -139,11 +141,17 @@ def read_grib(gribfile, read_coordinates=False):
     lons = []
     lats = []
 
-    with open(wrk_gribfile) as fp:
+    with open(wrk_gribfile, "rb") as fp:
         # print("Reading {}".format(gribfile))
 
         while True:
-            gh = ecc.codes_grib_new_from_file(fp)
+            try:
+                gh = ecc.codes_grib_new_from_file(fp)
+            except ecc.WrongLengthError as e:
+                print(e)
+                file_stats = os.stat(wrk_gribfile)
+                print("Size of {}: {}".format(wrk_gribfile, file_stats.st_size))
+                sys.exit(1)
 
             if gh is None:
                 break
@@ -355,7 +363,7 @@ def read_netatmo_obs(args, fcstime):
     testitmp2 = []
 
     if resp.status_code == 200:
-       testitmp2 = pd.DataFrame(resp.json())
+        testitmp2 = pd.DataFrame(resp.json())
 
     if resp.status_code != 200 or resp.json() == testitmp or len(testitmp2) == 0:
         print("Error fetching NetAtmo data, status code: {}".format(resp.status_code))
@@ -587,10 +595,20 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
         if tosp is not None:
             ecc.codes_set(h, "typeOfStatisticalProcessing", tosp)
             ecc.codes_set(h, "lengthOfTimeRange", 1)
-            ecc.codes_set(h, "yearOfEndOfOverallTimeInterval", int(forecasttime[j].strftime('%Y')))
-            ecc.codes_set(h, "monthOfEndOfOverallTimeInterval", int(forecasttime[j].strftime('%m')))
-            ecc.codes_set(h, "dayOfEndOfOverallTimeInterval", int(forecasttime[j].strftime('%d')))
-            ecc.codes_set(h, "hourOfEndOfOverallTimeInterval", int(forecasttime[j].strftime('%H')))
+            ecc.codes_set(
+                h, "yearOfEndOfOverallTimeInterval", int(forecasttime[j].strftime("%Y"))
+            )
+            ecc.codes_set(
+                h,
+                "monthOfEndOfOverallTimeInterval",
+                int(forecasttime[j].strftime("%m")),
+            )
+            ecc.codes_set(
+                h, "dayOfEndOfOverallTimeInterval", int(forecasttime[j].strftime("%d"))
+            )
+            ecc.codes_set(
+                h, "hourOfEndOfOverallTimeInterval", int(forecasttime[j].strftime("%H"))
+            )
             ecc.codes_set(h, "minuteOfEndOfOverallTimeInterval", 0)
             ecc.codes_set(h, "secondOfEndOfOverallTimeInterval", 0)
         ecc.codes_set(h, "typeOfFirstFixedSurface", 103)
