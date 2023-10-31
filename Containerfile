@@ -18,7 +18,6 @@ ADD https://lake.fmi.fi/ml-models/xgb_T2m_tuned23.joblib /snwc_bc
 ADD https://lake.fmi.fi/ml-models/xgb_WS_tuned23.joblib /snwc_bc
 ADD https://lake.fmi.fi/ml-models/xgb_WG_tuned23.joblib /snwc_bc
 ADD https://lake.fmi.fi/ml-models/xgb_RH_tuned23.joblib /snwc_bc
-ADD requirements.txt /snwc_bc
 
 RUN chmod 644 DEM_100m-Int16.tif && \
     chmod 644 xgb_T2m_tuned23.joblib && \
