@@ -69,6 +69,8 @@ def get_shapeofearth(gh):
     if shape == 5:
         return "+ellps=WGS84"
 
+    if shape == 6:
+        return "+R=6371229.0"
 
 def get_falsings(projstr, lon0, lat0):
     """Get east and north falsing for projected grib data"""
