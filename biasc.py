@@ -451,20 +451,7 @@ def detect_outliers_zscore(args, fcstime, obs_data):
     # remove outliers based on zscore with separate thresholds for upper and lower tail
     if args.parameter == "humidity":
         upper_threshold = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
-        lower_threshold = [
-            -4.5,
-            -4.5,
-            -4.5,
-            -4.5,
-            -4.5,
-            -4.5,
-            -4.5,
-            -4.5,
-            -4.5,
-            -4.5,
-            -4.5,
-            -4.5,
-        ]
+        lower_threshold = [-4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5, -4.5]
     elif args.parameter == "temperature":
         lower_threshold = [-6, -6, -5, -4, -4, -4, -4, -4, -4, -5, -6, -6]
         upper_threshold = [2.5, 2.5, 2.5, 3, 4, 5, 5, 5, 3, 2.5, 2.5, 2.5]
@@ -786,6 +773,7 @@ def train_data(
     # Calculate the elevation difference between the model and the obs points
     model_elev = gridpp.nearest(grid, points, topo)
     ElevD = model_elev - obs["elevation"]
+    obs_elevation = obs["elevation"]
 
     # MNWC analystime 0h is not used at all, start from forecasttime 1 (used as observation analysis)
     for j in range(1, len(forecasttime)):
@@ -793,6 +781,7 @@ def train_data(
         tmp_data["obs_lat"] = obs["latitude"]
         tmp_data["obs_lon"] = obs["longitude"]
         tmp_data["ElevD"] = ElevD
+        tmp_data["obs_elevation"] = obs_elevation
         tmp_data["S10M"] = gridpp.nearest(grid, points, ws[j])
         tmp_data["D10M"] = gridpp.nearest(grid, points, wd[j])
         tmp_data["GMAX"] = gridpp.nearest(grid, points, wg[j])
@@ -838,6 +827,7 @@ def modify(data, param):
                 "obs_lat",
                 "obs_lon",
                 "ElevD",
+                "obs_elevation",
                 "bias",
                 "month_sin",
                 "month_cos",
@@ -860,6 +850,7 @@ def modify(data, param):
                 "obs_lat",
                 "obs_lon",
                 "ElevD",
+                "obs_elevation",
                 "bias",
                 "month_sin",
                 "month_cos",
@@ -882,6 +873,7 @@ def modify(data, param):
                 "obs_lat",
                 "obs_lon",
                 "ElevD",
+                "obs_elevation",
                 "bias",
                 "month_sin",
                 "month_cos",
@@ -904,6 +896,7 @@ def modify(data, param):
                 "obs_lat",
                 "obs_lon",
                 "ElevD",
+                "obs_elevation",
                 "bias",
                 "month_sin",
                 "month_cos",
@@ -933,7 +926,7 @@ def ml_forecast(ml_data, param):
     elif param == "humidity":
         mlname = "RH"
 
-    regressor = joblib.load("xgb_" + mlname + "_tuned23.joblib")
+    regressor = joblib.load("xgb_" + mlname + "_1023.joblib")
 
     # Check that you have all the leadtimes (0-9)
     ajat = sorted(ml_data["leadtime"].unique().tolist())
