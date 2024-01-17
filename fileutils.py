@@ -3,6 +3,7 @@ import eccodes as ecc
 import fsspec
 import datetime
 import pyproj
+import os
 
 def get_shapeofearth(gh):
     """Return correct shape of earth sphere / ellipsoid in proj string format.
