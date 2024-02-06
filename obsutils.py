@@ -8,6 +8,8 @@ import os
 import rioxarray
 import pyproj
 from scipy.interpolate import RegularGridInterpolator
+from fileutils import write_grib
+import sys
 
 def read_conventional_obs(args, fcstime, mnwc, analysistime):
     parameter = args.parameter
