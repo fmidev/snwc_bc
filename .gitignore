@@ -1,0 +1,6 @@
+__pycache__
+# large DEM file used to get NetAtmo station heights
+DEM_100m-Int16.tif
+# ignore xgb models
+*.joblib
+*.grib2

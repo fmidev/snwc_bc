@@ -97,18 +97,18 @@ def read_conventional_obs(args, fcstime, mnwc, analysistime):
 
 def read_netatmo_obs(args, fcstime):
     # read Tiuha db NetAtmo observations for "analysis time" == leadtime 1
-    snwc1_key = os.environ.get("SNWC1_KEY")
-    assert snwc1_key is not None, "tiuha api key not find (env variable 'SNWC1_KEY')"
+    #snwc1_key = os.environ.get("SNWC1_KEY")
+    snwc1_prod3_key = os.environ.get("SNWC1_PROD3_KEY")
+    assert snwc1_prod3_key is not None, "tiuha api key not find (env variable 'SNWC1_PROD3_KEY')"
 
-    os.environ["NO_PROXY"] = "tiuha-dev.apps.ock.fmi.fi"
+    os.environ["NO_PROXY"] = "tiuha.apps.ocp.fmi.fi"
     obstime = fcstime[1]
 
-    url = "https://tiuha-dev.apps.ock.fmi.fi/v1/edr/collections/netatmo-air_temperature/cube?bbox=4,54,32,71.5&start={}Z&end={}Z".format(
+    url = "https://tiuha.apps.ocp.fmi.fi/v1/edr/collections/netatmo-air_temperature/cube?bbox=4,54,32,71.5&start={}Z&end={}Z".format(
         (obstime - datetime.timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%S"),
         obstime.strftime("%Y-%m-%dT%H:%M:%S"),
     )
-    headers = {"Authorization": f"Basic {snwc1_key}"}
-    # os.environ['NO_PROXY'] = 'tiuha-dev.apps.ock.fmi.fi'
+    headers = {"Authorization": f"Basic {snwc1_prod3_key}"}
     resp = requests.get(url, headers=headers)
 
     crowd_obs = None
