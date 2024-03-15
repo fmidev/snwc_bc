@@ -4,6 +4,7 @@ import fsspec
 import datetime
 import pyproj
 import os
+import sys
 
 def get_shapeofearth(gh):
     """Return correct shape of earth sphere / ellipsoid in proj string format.
@@ -104,7 +105,7 @@ def read_grib(gribfile, read_coordinates=False):
             except ecc.WrongLengthError as e:
                 print(e)
                 file_stats = os.stat(wrk_gribfile)
-                print("Size of {}: {}".format(wrk_gribfile, file_stats.st_size))
+                print("Size of {} is {} bytes".format(wrk_gribfile, file_stats.st_size))
                 sys.exit(1)
 
             if gh is None:
