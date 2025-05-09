@@ -1,6 +1,6 @@
 gridpp==0.7.1
 numpy 
-eccodes==2.41.0 
+eccodes==2.40.1 
 s3fs==2023.3.0
 xgboost==3.0.0
 pyproj
