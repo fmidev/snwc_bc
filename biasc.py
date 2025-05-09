@@ -271,8 +271,7 @@ def train_data(
         tmp_data["Q2M"] = gridpp.nearest(grid, points, q2[j])
         tmp_data["leadtime"] = j
         tmp_data["forecasttime"] = forecasttime[j]
-        data = data.append(tmp_data, ignore_index=True)
-        # data = pd.concat([data,tmp_data],join="inner")
+        data = pd.concat([data, tmp_data], ignore_index=True)
         # print("tmp:",tmp_points)
     return data
 
@@ -482,11 +481,31 @@ def main():
     oit = time.time()
     timedif = oit - mlt
     print("Interpolating forecasts takes:", round(timedif, 1), "seconds")
-    # calculate the final bias corrected forecast fields: MNWC - bias_correction
-    # and convert parameter to T-K or RH-0TO1
+    
+    # QC monthly tresholds for the bias correction
+    # these are min +1 and max -1 when compared with vire qc
+    T2m_thresholds = {
+    1: (222, 294),
+    2: (230, 296),
+    3: (232, 304),
+    4: (237, 305),
+    5: (247, 312),
+    6: (254, 316),
+    7: (259, 317),
+    8: (258, 314),
+    9: (250, 310),
+    10: (237, 306),
+    11: (229, 296),
+    12: (227, 293)
+    }
+    
     output = []
     for j in range(0, len(diff)):
+        #print("min diff:", np.min(diff[j]))
+        #print("max diff:", np.max(diff[j]))
         tmp_output = background[j + 1] - diff[j]
+        month = forecasttime[j + 1].month
+        t2m_qc = T2m_thresholds[month]
         # Implement simple QC thresholds
         if args.parameter == "humidity":
             tmp_output = np.clip(tmp_output, 5, 100)  # min RH 5% !
@@ -497,6 +516,10 @@ def main():
             tmp_output = np.clip(tmp_output, 0, 50)
         elif args.parameter == "temperature":
             tmp_output = tmp_output + 273.15
+            # limit temperature to t2m_qc thresholds
+            tmp_output = np.clip(tmp_output, t2m_qc[0], t2m_qc[1])
+            #print("min value of the output grid:", np.min(tmp_output))
+            #print("max value of the output grid:", np.max(tmp_output))           
         output.append(tmp_output)
 
     # Remove analysistime (leadtime=0), because correction is not made for that time
