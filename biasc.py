@@ -26,6 +26,24 @@ from plot_output import plot
 
 warnings.filterwarnings("ignore")
 
+def parse_kv(kv):
+    """Parse a key=value string into a dictionary."""
+    if kv is None:
+        return None
+    if isinstance(kv, str):
+        kv = [kv]
+    d = {}
+    for item in kv:
+        if item == "None":
+            continue
+        k, v = item.split("=")
+        try:
+            v = float(v)
+        except ValueError:
+            pass
+        d[k] = v
+    return d
+
 def parse_command_line():
     parser = argparse.ArgumentParser()
     parser.add_argument("--topography_data", action="store", type=str, required=True)
@@ -45,13 +63,15 @@ def parse_command_line():
     parser.add_argument("--output", action="store", type=str, required=True)
     parser.add_argument("--plot", action="store_true", default=False)
     parser.add_argument("--disable_multiprocessing", action="store_true", default=False)
-
+    parser.add_argument("--grib_options", action="store", nargs="+", metavar="KEY=VALUE", type=str, default=None, required=False)
     args = parser.parse_args()
 
     allowed_params = ["temperature", "humidity", "windspeed", "gust"]
     if args.parameter not in allowed_params:
         print("Error: parameter must be one of: {}".format(allowed_params))
         sys.exit(1)
+
+    args.grib_options = parse_kv(args.grib_options)
 
     return args
 
@@ -531,7 +551,7 @@ def main():
         # replace nan/None with missing data in grib 9999
         output = np.where(np.isnan(output) | (output == None), 9999, output)
         # exit()
-    write_grib(args, analysistime, forecasttime, output)
+    write_grib(args, analysistime, forecasttime, output, args.grib_options)
 
     if args.plot:
         plot(obs, background, output, diff, lons, lats, args)

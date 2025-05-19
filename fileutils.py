@@ -193,7 +193,7 @@ def read_grid(args):
     grid = gridpp.Grid(lats, lons, topo, lc)
     return grid, lons, lats, vals, analysistime, forecasttime, lc, topo
 
-def write_grib_message(fp, args, analysistime, forecasttime, data):
+def write_grib_message(fp, args, analysistime, forecasttime, data, grib_options):
     pdtn = 70
     tosp = None
     if args.parameter == "humidity":
@@ -283,11 +283,16 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
         ecc.codes_set(h, "typeOfGeneratingProcess", 2)  # deterministic forecast
         ecc.codes_set(h, "typeOfProcessedData", 2)  # analysis and forecast products
         ecc.codes_set_values(h, tdata.flatten())
+
+        if grib_options is not None:
+            for key, value in grib_options.items():
+                ecc.codes_set(h, key, value)
+
         ecc.codes_write(h, fp)
     ecc.codes_release(h)
 
 
-def write_grib(args, analysistime, forecasttime, data):
+def write_grib(args, analysistime, forecasttime, data, grib_options=None):
     if args.output.startswith("s3://"):
         openfile = fsspec.open(
             "simplecache::{}".format(args.output),
@@ -300,9 +305,9 @@ def write_grib(args, analysistime, forecasttime, data):
             },
         )
         with openfile as fpout:
-            write_grib_message(fpout, args, analysistime, forecasttime, data)
+            write_grib_message(fpout, args, analysistime, forecasttime, data, grib_options)
     else:
         with open(args.output, "wb") as fpout:
-            write_grib_message(fpout, args, analysistime, forecasttime, data)
+            write_grib_message(fpout, args, analysistime, forecasttime, data, grib_options)
 
     print(f"Wrote file {args.output}")
