@@ -89,7 +89,6 @@ def read_conventional_obs(args, fcstime, mnwc, analysistime):
         write_grib(args, analysistime, fcstime, mnwc)
         sys.exit(1)
 
-    # print(obs.head(5))
     print("min obs:", min(obs.iloc[:, 5]))
     print("max obs:", max(obs.iloc[:, 5]))
     return obs
@@ -103,8 +102,14 @@ def read_netatmo_obs(args, fcstime):
 
     os.environ["NO_PROXY"] = "tiuha.apps.ocp.fmi.fi"
     obstime = fcstime[1]
+    if args.parameter == "temperature":
+        netatmo_parameter = "netatmo-air_temperature"
+    elif args.parameter == "humidity":
+        netatmo_parameter = "netatmo-relative_humidity"
+    # netatmo-relative_humidity 
 
-    url = "https://tiuha.apps.ocp.fmi.fi/v1/edr/collections/netatmo-air_temperature/cube?bbox=4,54,32,71.5&start={}Z&end={}Z".format(
+    url = "https://tiuha.apps.ocp.fmi.fi/v1/edr/collections/{}/cube?bbox=4,54,32,71.5&start={}Z&end={}Z".format(
+        netatmo_parameter,
         (obstime - datetime.timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%S"),
         obstime.strftime("%Y-%m-%dT%H:%M:%S"),
     )
@@ -136,7 +141,7 @@ def read_netatmo_obs(args, fcstime):
                 "geometry_coordinates_1": "latitude",
                 "geometry_coordinates_2": "station_id",
                 "properties_resultTime": "utctime",
-                "properties_result": "temperature",
+                "properties_result": "netatmo_obs",
             }
         )
         # Remove duplicated observations/station by removing duplicated lat/lon values and keep the first value only
@@ -177,7 +182,7 @@ def read_netatmo_obs(args, fcstime):
         obs["elevation"] = interp(points)
 
         obs = obs.drop(columns=["x", "y"])
-        # print(obs.head(5))
+
         # reorder/rename columns of the NetAtmo df to match with synop data
         obs = obs[
             [
@@ -186,11 +191,13 @@ def read_netatmo_obs(args, fcstime):
                 "latitude",
                 "utctime",
                 "elevation",
-                "temperature",
+                "netatmo_obs",
             ]
         ]
-        obs.rename(columns={"temperature": "TA_PT1M_AVG"}, inplace=True)
-        # print(obs.head(10))
+        if args.parameter == "temperature":
+            obs.rename(columns={"netatmo_obs": "TA_PT1M_AVG"}, inplace=True)
+        elif args.parameter == "humidity":
+            obs.rename(columns={"netatmo_obs": "RH_PT1M_AVG"}, inplace=True)
         print("min NetAtmo obs:", min(obs.iloc[:, 5]))
         print("max NetAtmo obs:", max(obs.iloc[:, 5]))
 
@@ -235,10 +242,10 @@ def read_obs(args, fcstime, grid, lc, mnwc, analysistime):
 
     obs = read_conventional_obs(args, fcstime, mnwc, analysistime)
 
-    # for temperature we also have netatmo stations
+    # for temperature and RH we also have netatmo stations
     # these are optional
 
-    if args.parameter == "temperature":
+    if args.parameter == "temperature" or args.parameter == "humidity":
         netatmo = read_netatmo_obs(args, fcstime)
         if netatmo is not None:
             obs = pd.concat((obs, netatmo))
@@ -258,12 +265,13 @@ def read_obs(args, fcstime, grid, lc, mnwc, analysistime):
     )
     # interpolate nearest land sea mask values from grid to obs points (NWP data used, since there's no lsm info from obs stations available)
     obs["lsm"] = gridpp.nearest(grid, points1, lc)
-
+    
+    
     points = gridpp.Points(
         obs["latitude"].to_numpy(),
         obs["longitude"].to_numpy(),
         obs["elevation"].to_numpy(),
         obs["lsm"].to_numpy(),
     )
-
-    return points, obs
+    
+    return points,obs

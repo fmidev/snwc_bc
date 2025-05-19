@@ -17,8 +17,8 @@ def plot(obs, background, output, diff, lons, lats, args):
     elif args.parameter == "humidity":
         obs_parameter = "RH_PT1M_AVG"
         output = np.multiply(output, 100)
-        vmin1 = -30
-        vmax1 = 30
+        vmin1 = -40
+        vmax1 = 40
 
     vmin = min(np.amin(background), np.amin(output))
     vmax = min(np.amax(background), np.amax(output))

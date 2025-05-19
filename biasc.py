@@ -155,13 +155,13 @@ def interpolate_single_time(
         structure,
         max_points,
     )
-
+    """
     print(
         "step {} min grid: {:.1f} max grid: {:.1f}".format(
             idx, np.amin(tmp_output), np.amax(tmp_output)
         )
     )
-
+    """
     if q is not None:
         # return index and output, so that the results can
         # later be sorted correctly
@@ -335,15 +335,15 @@ def modify(data, param):
         ]
         data.rename(columns={"bias": "T1bias"}, inplace=True)
     elif param == "windspeed":
-        data = data.drop(["RH2M", "Q2M"], axis=1)
+        data = data.drop(["CCLOW", "Q2M"], axis=1)
         data = data[
             [
                 "leadtime",
                 "D10M",
                 "T2M",
                 "S10M",
+                "RH2M",
                 "PMSL",
-                "CCLOW",
                 "GMAX",
                 "obs_lat",
                 "obs_lon",
@@ -424,7 +424,7 @@ def ml_forecast(ml_data, param):
     elif param == "humidity":
         mlname = "RH"
 
-    regressor = joblib.load("xgb_" + mlname + "_1023.joblib")
+    regressor = joblib.load("xgb_" + mlname + "_0924.joblib")
 
     # Check that you have all the leadtimes (0-9)
     ajat = sorted(ml_data["leadtime"].unique().tolist())
@@ -449,7 +449,7 @@ def ml_forecast(ml_data, param):
     ml_results = []
     ml_results.append(lt1)
 
-    # Store bias correected forecast for leadtimes 2...x to list
+    # Store bias corrected forecast for leadtimes 2...x to list
     for j in range(1, len(ajat)):
         lt_tmp = ml_data[ml_data["leadtime"] == j + 1]
         ml_results.append(lt_tmp)
@@ -521,8 +521,11 @@ def main():
     
     output = []
     for j in range(0, len(diff)):
-        #print("min diff:", np.min(diff[j]))
-        #print("max diff:", np.max(diff[j]))
+        if args.parameter == "humidity":
+            diff[j] = np.clip(diff[j], -40, 40) # limit the change done to the MNWC to 40
+        elif args.parameter == "temperature":
+            diff[j] = np.clip(diff[j], -10, 10) # limit the change done to the MNWC to 10
+        print(f"step {j} min grid: {np.min(diff[j]):.1f} max grid: {np.max(diff[j]):.1f}")    
         tmp_output = background[j + 1] - diff[j]
         month = forecasttime[j + 1].month
         t2m_qc = T2m_thresholds[month]

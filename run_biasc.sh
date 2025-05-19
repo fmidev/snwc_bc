@@ -3,7 +3,6 @@
 
 #python3.11 --version
 
-
 parameter=$1 # T2m, RH, WS or WG
 
 WEEKDAY=`date +"%a"`
@@ -13,8 +12,6 @@ HH=2
 NN=$(($AIKA1-$HH))
 bucket="s3://routines-data-prod/mnwc-biascorrection/prod/"
 echo $NN
-
-#export TMPDIR=/data/hietal/testi
 
 if [ "$parameter" == "T2m" ]; then
   pyparam="temperature"
@@ -30,5 +27,7 @@ else
 fi
 
 python3 biasc.py --topography_data "$bucket""$NN"00/Z-M2S2.grib2 --landseacover "$bucket""$NN"00/LC-0TO1.grib2 --t2_data "$bucket""$NN"00/T-K.grib2 --wg_data "$bucket""$NN"00/FFG-MS.grib2 --nl_data "$bucket""$NN"00/NL-0TO1.grib2 --ppa_data "$bucket""$NN"00/P-PA.grib2 --wd_data "$bucket""$NN"00/DD-D.grib2 --q2_data "$bucket""$NN"00/Q-KGKG.grib2 --ws_data "$bucket""$NN"00/FF-MS.grib2 --rh_data "$bucket""$NN"00/RH-0TO1.grib2 --output testi_"$parameter".grib2 --parameter "$pyparam"
+# with plot option
+#python3 biasc.py --topography_data "$bucket""$NN"00/Z-M2S2.grib2 --landseacover "$bucket""$NN"00/LC-0TO1.grib2 --t2_data "$bucket""$NN"00/T-K.grib2 --wg_data "$bucket""$NN"00/FFG-MS.grib2 --nl_data "$bucket""$NN"00/NL-0TO1.grib2 --ppa_data "$bucket""$NN"00/P-PA.grib2 --wd_data "$bucket""$NN"00/DD-D.grib2 --q2_data "$bucket""$NN"00/Q-KGKG.grib2 --ws_data "$bucket""$NN"00/FF-MS.grib2 --rh_data "$bucket""$NN"00/RH-0TO1.grib2 --output testi_"$parameter".grib2 --parameter "$pyparam" --plot
 
-#rm -r /data/hietal/testi/tmp*
+
