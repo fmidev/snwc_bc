@@ -199,18 +199,18 @@ def write_grib_message(fp, args, analysistime, forecasttime, data):
     if args.parameter == "humidity":
         levelvalue = 2
         pcat = 1
-        pnum = 192
+        pnum = 193
     elif args.parameter == "temperature":
         levelvalue = 2
-        pnum = 0
+        pnum = 193
         pcat = 0
     elif args.parameter == "windspeed":
         pcat = 2
-        pnum = 1
+        pnum = 194
         levelvalue = 10
     elif args.parameter == "gust":
         levelvalue = 10
-        pnum = 22
+        pnum = 195
         pcat = 2
         pdtn = 72
         tosp = 2
