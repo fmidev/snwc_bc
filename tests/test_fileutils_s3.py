@@ -8,6 +8,7 @@ import unittest
 class TestS3EndpointUrl(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls._original_s3_hostname = os.environ.get("S3_HOSTNAME")
         cls._original_modules = {}
         for module_name in ("numpy", "eccodes", "fsspec", "pyproj"):
             cls._original_modules[module_name] = sys.modules.get(module_name)
@@ -21,13 +22,18 @@ class TestS3EndpointUrl(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        if cls._original_s3_hostname is None:
+            os.environ.pop("S3_HOSTNAME", None)
+        else:
+            os.environ["S3_HOSTNAME"] = cls._original_s3_hostname
+
         for module_name, original_module in cls._original_modules.items():
             if original_module is None:
                 del sys.modules[module_name]
             else:
                 sys.modules[module_name] = original_module
 
-    def tearDown(self):
+    def setUp(self):
         os.environ.pop("S3_HOSTNAME", None)
 
     def test_default_s3_host_is_used_when_env_is_missing(self):
