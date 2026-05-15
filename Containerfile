@@ -13,11 +13,13 @@ RUN git clone https://github.com/fmidev/snwc_bc.git
 
 WORKDIR /snwc_bc
 
-ADD https://lake.fmi.fi/dem-data/DEM_100m-Int16.tif /snwc_bc
-ADD https://lake.fmi.fi/ml-models/mnwc-biascorrection/xgb_T2m_0924.joblib /snwc_bc
-ADD https://lake.fmi.fi/ml-models/mnwc-biascorrection/xgb_WS_0924.joblib /snwc_bc
-ADD https://lake.fmi.fi/ml-models/mnwc-biascorrection/xgb_WG_0924.joblib /snwc_bc
-ADD https://lake.fmi.fi/ml-models/mnwc-biascorrection/xgb_RH_0924.joblib /snwc_bc
+ARG S3_HOSTNAME=lake.fmi.fi
+
+ADD https://${S3_HOSTNAME}/dem-data/DEM_100m-Int16.tif /snwc_bc
+ADD https://${S3_HOSTNAME}/ml-models/mnwc-biascorrection/xgb_T2m_0924.joblib /snwc_bc
+ADD https://${S3_HOSTNAME}/ml-models/mnwc-biascorrection/xgb_WS_0924.joblib /snwc_bc
+ADD https://${S3_HOSTNAME}/ml-models/mnwc-biascorrection/xgb_WG_0924.joblib /snwc_bc
+ADD https://${S3_HOSTNAME}/ml-models/mnwc-biascorrection/xgb_RH_0924.joblib /snwc_bc
 
 RUN chmod 644 DEM_100m-Int16.tif && \
     chmod 644 xgb_T2m_0924.joblib && \

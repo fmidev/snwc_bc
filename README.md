@@ -9,6 +9,8 @@ sh run_biasc.sh T2m # RH, WS or WG
 ```
 * Run time of ~20min past recommended to include sufficient amount of observations
 * run_biasc.sh needs parameter as input (T2m, RH, WS or WG) and calculates the biasc.py for realtime data available in S3 (only available at FMI). Timestamp is defined as -2h of the current time in shell script.     
+* S3 endpoint defaults to `https://lake.fmi.fi`, but can be changed by setting environment variable `S3_HOSTNAME` (for example `S3_HOSTNAME=your-s3-host.example`).
+* Container build uses the same default and can be overridden with `podman build --build-arg S3_HOSTNAME=your-s3-host.example ...`.
 
 ## Authors
 leila.hieta@fmi.fi mikko.partio@fmi.fi
