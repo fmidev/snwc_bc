@@ -56,6 +56,13 @@ class TestS3EndpointUrl(unittest.TestCase):
             "https://custom.example",
         )
 
+    def test_s3_host_with_http_protocol_is_used_as_is(self):
+        os.environ["S3_HOSTNAME"] = "http://custom.example"
+        self.assertEqual(
+            self.fileutils.get_s3_endpoint_url(),
+            "http://custom.example",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
