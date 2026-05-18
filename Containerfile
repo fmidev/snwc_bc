@@ -9,7 +9,7 @@ RUN dnf -y install dnf-plugins-core && \
     dnf -y --setopt=install_weak_deps=False install python3.11 python3.11-pip python3.11-setuptools eccodes git && \
     dnf -y clean all && rm -rf /var/cache/dnf
 
-RUN git clone https://github.com/fmidev/snwc_bc.git
+ADD . /snwc_bc
 
 WORKDIR /snwc_bc
 
