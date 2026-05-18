@@ -1,6 +1,9 @@
 on: # yamllint disable-line rule:truthy
   push:
-    branches: ["main", "preop"]
+    branches:
+      - main
+      - preop
+  workflow_dispatch:
 
 name: Create container image
 
