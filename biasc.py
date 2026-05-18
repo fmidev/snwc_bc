@@ -424,7 +424,8 @@ def ml_forecast(ml_data, param):
     elif param == "humidity":
         mlname = "RH"
 
-    regressor = joblib.load("xgb_" + mlname + "_0924.joblib")
+    ml_version = os.environ.get("MODEL_VERSION", "0924")
+    regressor = joblib.load(f"xgb_{mlname}_{ml_version}.joblib")
 
     # Check that you have all the leadtimes (0-9)
     ajat = sorted(ml_data["leadtime"].unique().tolist())
