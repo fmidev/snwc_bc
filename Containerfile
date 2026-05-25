@@ -14,12 +14,13 @@ ADD . /snwc_bc
 WORKDIR /snwc_bc
 
 ENV MODEL_VERSION 15km_0526
+ARG S3_HOSTNAME=lake.fmi.fi
 
-ADD https://lake.fmi.fi/dem-data/DEM_100m-Int16.tif /snwc_bc
-ADD https://lake.fmi.fi/ml-models/mnwc-biascorrection/xgb_T2m_${MODEL_VERSION}.joblib /snwc_bc
-ADD https://lake.fmi.fi/ml-models/mnwc-biascorrection/xgb_WS_${MODEL_VERSION}.joblib /snwc_bc
-ADD https://lake.fmi.fi/ml-models/mnwc-biascorrection/xgb_WG_${MODEL_VERSION}.joblib /snwc_bc
-ADD https://lake.fmi.fi/ml-models/mnwc-biascorrection/xgb_RH_${MODEL_VERSION}.joblib /snwc_bc
+ADD https://${S3_HOSTNAME}/dem-data/DEM_100m-Int16.tif /snwc_bc
+ADD https://${S3_HOSTNAME}/ml-models/mnwc-biascorrection/xgb_T2m_${MODEL_VERSION}.joblib /snwc_bc
+ADD https://${S3_HOSTNAME}/ml-models/mnwc-biascorrection/xgb_WS_${MODEL_VERSION}.joblib /snwc_bc
+ADD https://${S3_HOSTNAME}/ml-models/mnwc-biascorrection/xgb_WG_${MODEL_VERSION}.joblib /snwc_bc
+ADD https://${S3_HOSTNAME}/ml-models/mnwc-biascorrection/xgb_RH_${MODEL_VERSION}.joblib /snwc_bc
 
 RUN chmod 644 DEM_100m-Int16.tif && \
     chmod 644 xgb_T2m_${MODEL_VERSION}.joblib && \

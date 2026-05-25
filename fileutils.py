@@ -6,6 +6,16 @@ import pyproj
 import os
 import sys
 
+DEFAULT_S3_HOSTNAME = "lake.fmi.fi"
+
+
+def get_s3_endpoint_url():
+    s3_hostname = os.getenv("S3_HOSTNAME", DEFAULT_S3_HOSTNAME)
+    if s3_hostname.startswith(("https://", "http://")):
+        return s3_hostname
+    return f"https://{s3_hostname}"
+
+
 def get_shapeofearth(gh):
     """Return correct shape of earth sphere / ellipsoid in proj string format.
     Source data is grib2 definition.
@@ -75,7 +85,7 @@ def read_file_from_s3(grib_file):
     return fsspec.open_local(
         uri,
         mode="rb",
-        s3={"anon": True, "client_kwargs": {"endpoint_url": "https://lake.fmi.fi"}},
+        s3={"anon": True, "client_kwargs": {"endpoint_url": get_s3_endpoint_url()}},
     )
 
 
@@ -301,7 +311,7 @@ def write_grib(args, analysistime, forecasttime, data, grib_options=None):
                 "anon": False,
                 "key": os.environ["S3_ACCESS_KEY_ID"],
                 "secret": os.environ["S3_SECRET_ACCESS_KEY"],
-                "client_kwargs": {"endpoint_url": "https://lake.fmi.fi"},
+                "client_kwargs": {"endpoint_url": get_s3_endpoint_url()},
             },
         )
         with openfile as fpout:
