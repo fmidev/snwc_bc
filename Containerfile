@@ -9,7 +9,7 @@ RUN dnf -y install dnf-plugins-core && \
     dnf -y --setopt=install_weak_deps=False install python3.11 python3.11-pip python3.11-setuptools eccodes git && \
     dnf -y clean all && rm -rf /var/cache/dnf
 
-RUN git clone https://github.com/fmidev/snwc_bc.git
+ADD . /snwc_bc
 
 WORKDIR /snwc_bc
 
@@ -22,9 +22,9 @@ ADD https://${S3_HOSTNAME}/ml-models/mnwc-biascorrection/xgb_WG_0924.joblib /snw
 ADD https://${S3_HOSTNAME}/ml-models/mnwc-biascorrection/xgb_RH_0924.joblib /snwc_bc
 
 RUN chmod 644 DEM_100m-Int16.tif && \
-    chmod 644 xgb_T2m_0924.joblib && \
-    chmod 644 xgb_WS_0924.joblib && \
-    chmod 644 xgb_WG_0924.joblib && \
-    chmod 644 xgb_RH_0924.joblib && \
+    chmod 644 xgb_T2m_${MODEL_VERSION}.joblib && \
+    chmod 644 xgb_WS_${MODEL_VERSION}.joblib && \
+    chmod 644 xgb_WG_${MODEL_VERSION}.joblib && \
+    chmod 644 xgb_RH_${MODEL_VERSION}.joblib && \
     update-alternatives --set python3 /usr/bin/python3.11 && \
     python3 -m pip --no-cache-dir install -r requirements.txt

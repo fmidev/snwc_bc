@@ -1,6 +1,9 @@
 on: # yamllint disable-line rule:truthy
   push:
-    branches: ["main"]
+    branches:
+      - main
+      - preop
+  workflow_dispatch:
 
 name: Create container image
 
@@ -9,6 +12,7 @@ jobs:
     uses: fmidev/github-actions-workflows/.github/workflows/imagebuild-workflow.yaml@main
     with:
       image_name: snwc_bc
+      image_tag: ${{ github.ref == 'refs/heads/main' && 'latest' || github.ref == 'refs/heads/preop' && 'preop' || 'latest' }}
       image_test_command: python3 /snwc_bc/biasc.py --help
     secrets:
       QUAY_USER: ${{ secrets.QUAY_USER }}
