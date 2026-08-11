@@ -13,7 +13,7 @@ ADD . /snwc_bc
 
 WORKDIR /snwc_bc
 
-ENV MODEL_VERSION 15km_0526
+ENV MODEL_VERSION 15km_0726
 ARG S3_HOSTNAME=lake.fmi.fi
 
 ADD https://${S3_HOSTNAME}/dem-data/DEM_100m-Int16.tif /snwc_bc
